@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>nfc-text — make a tag URL</title>
+<meta name="description" content="Build a URL for an NFC tag that displays a short message.">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="nfc-text — make a tag URL">
+<meta property="og:description" content="Build a URL for an NFC tag that displays a short message.">
+<meta property="og:image" content="/og.png">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+
+<style>
+  :root {
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    --accent: #4a2;
+    --accent-hover: #391;
+  }
+  [data-bs-theme="dark"] { --accent: #464; --accent-hover: #383; }
+
+  html, body { height: 100%; }
+  body {
+    font-family: var(--mono);
+    font-size: 1.0625rem;
+    line-height: 1.5;
+    margin: 0;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    box-sizing: border-box;
+  }
+  main {
+    flex: 1;
+    max-width: 72ch;
+    margin: 0 auto;
+    width: 100%;
+    padding: 1rem 0;
+  }
+  a { color: #03c; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  [data-bs-theme="dark"] a { color: #39f; }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin: 0 0 0.25rem;
+    text-align: center;
+  }
+  .subhead {
+    font-size: 0.95rem;
+    opacity: 0.7;
+    text-align: center;
+    margin: 0 0 2rem;
+  }
+  h2 {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    font-weight: bold;
+    margin: 2rem 0 0.5rem;
+    opacity: 0.6;
+    text-transform: lowercase;
+    letter-spacing: 0.05em;
+  }
+
+  textarea, input[type="text"] {
+    font-family: var(--mono);
+    font-size: 1rem;
+    width: 100%;
+    padding: 0.75rem;
+    background: transparent;
+    color: inherit;
+    border: 2px solid #ccc;
+    border-radius: 0;
+    box-sizing: border-box;
+    resize: vertical;
+  }
+  textarea:focus, input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  [data-bs-theme="dark"] textarea, [data-bs-theme="dark"] input[type="text"] { border-color: #444; }
+  [data-bs-theme="dark"] textarea:focus, [data-bs-theme="dark"] input[type="text"]:focus { border-color: var(--accent); }
+
+  textarea { min-height: 8rem; }
+
+  .url-box {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    border: 2px dashed #ccc;
+    word-break: break-all;
+    font-size: 0.95rem;
+    min-height: 3.5rem;
+    display: flex;
+    align-items: center;
+  }
+  [data-bs-theme="dark"] .url-box { border-color: #333; }
+  .url-box.empty { opacity: 0.4; font-style: italic; }
+
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    flex-wrap: wrap;
+  }
+  .capacity {
+    font-family: var(--mono);
+  }
+  .capacity .pill {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    margin-left: 0.4rem;
+    background: rgba(0,0,0,0.05);
+    border: 1px solid currentColor;
+  }
+  [data-bs-theme="dark"] .capacity .pill { background: rgba(255,255,255,0.05); }
+  .capacity.fits-213 { color: #2a7; }
+  .capacity.fits-215 { color: #c80; }
+  .capacity.fits-216 { color: #a40; }
+  .capacity.too-big  { color: #c33; }
+  [data-bs-theme="dark"] .capacity.fits-213 { color: #4d9; }
+  [data-bs-theme="dark"] .capacity.fits-215 { color: #eb4; }
+  [data-bs-theme="dark"] .capacity.fits-216 { color: #f73; }
+  [data-bs-theme="dark"] .capacity.too-big  { color: #f55; }
+
+  .btn-copy {
+    font-family: var(--mono);
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0;
+    cursor: pointer;
+  }
+  .btn-copy:hover { background: var(--accent-hover); }
+  .btn-copy:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .bypass {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-left: 3px solid var(--accent);
+    background: rgba(74,170,34,0.06);
+    font-size: 0.95rem;
+    display: none;
+  }
+  .bypass.show { display: block; }
+  .bypass strong { display: block; margin-bottom: 0.4rem; }
+  .bypass code {
+    background: rgba(0,0,0,0.08);
+    padding: 0.1rem 0.4rem;
+    border-radius: 0;
+  }
+  [data-bs-theme="dark"] .bypass code { background: rgba(255,255,255,0.08); }
+  .bypass-copy {
+    font-family: var(--mono);
+    margin-left: 0.5rem;
+    padding: 0.15rem 0.5rem;
+    background: transparent;
+    border: 1px solid currentColor;
+    color: inherit;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+
+  .instructions {
+    margin-top: 1rem;
+    font-size: 0.95rem;
+    opacity: 0.85;
+  }
+  .instructions ol { padding-left: 1.25rem; }
+  .instructions li { margin: 0.25rem 0; }
+
+  .preview-link {
+    display: inline-block;
+    margin-top: 0.75rem;
+    padding: 0.4rem 0.9rem;
+    border: 1px solid currentColor;
+    font-size: 0.9rem;
+  }
+
+  footer {
+    font-size: 0.85rem;
+    opacity: 0.5;
+    text-align: center;
+    padding: 1.5rem 0 0.5rem;
+  }
+
+  .copied-toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent);
+    color: white;
+    padding: 0.5rem 1rem;
+    font-family: var(--mono);
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+    z-index: 1000;
+  }
+  .copied-toast.show { opacity: 1; }
+</style>
+
+<script>
+  (function () {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    function apply() {
+      document.documentElement.setAttribute('data-bs-theme', mq.matches ? 'dark' : 'light');
+    }
+    apply();
+    mq.addEventListener('change', apply);
+  })();
+</script>
+</head>
+<body>
+
+<main>
+  <h1><a href="../" style="color:inherit">nfc-text</a></h1>
+  <p class="subhead">make a tag URL</p>
+
+  <label for="msg" style="font-size:0.85rem; opacity:0.7;">message</label>
+  <textarea id="msg" placeholder="Door code: 4827" autocomplete="off" autocapitalize="sentences"></textarea>
+
+  <label for="title" style="font-size:0.85rem; opacity:0.7; margin-top:1rem; display:block;">title (optional, small text above message)</label>
+  <input id="title" type="text" placeholder="" autocomplete="off">
+
+  <h2>your tag URL</h2>
+  <div class="url-box empty" id="urlBox">(enter a message above)</div>
+  <div class="meta-row">
+    <div class="capacity" id="capacity">&nbsp;</div>
+    <div>
+      <a id="previewLink" class="preview-link" href="#" target="_blank" rel="noopener" style="display:none">preview →</a>
+      <button id="copyBtn" class="btn-copy" type="button" disabled>Copy URL</button>
+    </div>
+  </div>
+
+  <div id="bypass" class="bypass"></div>
+
+  <h2>writing it to a tag</h2>
+  <div class="instructions">
+    <ol>
+      <li>Install an NFC writer app — <a href="https://apps.apple.com/app/id1252962749" target="_blank" rel="noopener">NFC Tools (iOS)</a>, <a href="https://play.google.com/store/apps/details?id=com.wakdev.wdnfc" target="_blank" rel="noopener">NFC Tools (Android)</a>, or any equivalent.</li>
+      <li>Copy the URL above.</li>
+      <li>In the app, choose <em>Write → URL/URI</em>, paste, and tap your blank tag.</li>
+    </ol>
+  </div>
+
+  <h2>about the URL</h2>
+  <p style="font-size:0.95rem; opacity:0.85;">
+    The message lives in the URL fragment (after <code>#</code>). Browsers never send fragments to servers, so your message stays out of HTTP logs and analytics. Everything renders in the recipient's browser.
+  </p>
+</main>
+
+<footer>
+  <a href="../">← back</a>
+</footer>
+
+<div class="copied-toast" id="toast">copied</div>
+
+<script>
+(function () {
+  var msgEl = document.getElementById('msg');
+  var titleEl = document.getElementById('title');
+  var urlBox = document.getElementById('urlBox');
+  var capacity = document.getElementById('capacity');
+  var copyBtn = document.getElementById('copyBtn');
+  var previewLink = document.getElementById('previewLink');
+  var bypass = document.getElementById('bypass');
+
+  // Origin minus /make/ — i.e. the display page's URL.
+  var base = window.location.origin + window.location.pathname.replace(/make\/?$/, '');
+
+  function update() {
+    var t = msgEl.value;
+    var title = titleEl.value;
+
+    if (!t) {
+      urlBox.textContent = '(enter a message above)';
+      urlBox.classList.add('empty');
+      capacity.innerHTML = '&nbsp;';
+      capacity.className = 'capacity';
+      copyBtn.disabled = true;
+      previewLink.style.display = 'none';
+      bypass.classList.remove('show');
+      return;
+    }
+
+    var frag = 't=' + encodeURIComponent(t);
+    if (title) frag += '&title=' + encodeURIComponent(title);
+    var url = base + '#' + frag;
+
+    urlBox.textContent = url;
+    urlBox.classList.remove('empty');
+    copyBtn.disabled = false;
+    previewLink.style.display = 'inline-block';
+    previewLink.href = url;
+
+    // Byte count: NDEF URI record overhead is ~7 bytes (header + type + status),
+    // plus 1 byte if the URI prefix isn't compressed. We're conservative.
+    var urlBytes = new TextEncoder().encode(url).length;
+    var ndefBytes = urlBytes + 7;
+
+    var cap, label;
+    if (ndefBytes <= 120) { cap = 'fits-213'; label = 'fits NTAG213 (~120B usable)'; }
+    else if (ndefBytes <= 480) { cap = 'fits-215'; label = 'needs NTAG215 (~480B usable)'; }
+    else if (ndefBytes <= 868) { cap = 'fits-216'; label = 'needs NTAG216 (~868B usable)'; }
+    else { cap = 'too-big'; label = 'too long for common NTAG21x tags'; }
+
+    capacity.className = 'capacity ' + cap;
+    capacity.innerHTML = ndefBytes + ' B <span class="pill">' + label + '</span>';
+
+    updateBypass(t);
+  }
+
+  function updateBypass(text) {
+    var trimmed = text.trim();
+    var suggestion = null;
+
+    // Phone: at least 7 digits, optional leading +, allows spaces/dashes/parens
+    if (/^\+?[\d][\d\s\-().]{5,}$/.test(trimmed) && (trimmed.match(/\d/g) || []).length >= 7) {
+      var digits = trimmed.replace(/[^\d+]/g, '');
+      suggestion = {
+        label: 'This looks like a phone number.',
+        uri: 'tel:' + digits,
+        explain: 'iOS handles <code>tel:</code> NDEF records natively — you can write <code>tel:' + digits + '</code> directly to your tag and skip this site entirely.'
+      };
+    } else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      suggestion = {
+        label: 'This looks like an email address.',
+        uri: 'mailto:' + trimmed,
+        explain: 'iOS handles <code>mailto:</code> NDEF records natively. You can write <code>mailto:' + trimmed + '</code> directly to your tag instead.'
+      };
+    } else if (/^https?:\/\/\S+$/i.test(trimmed)) {
+      suggestion = {
+        label: 'This looks like a URL.',
+        uri: trimmed,
+        explain: 'Write the URL <em>directly</em> to your tag — no need to wrap it in this site.'
+      };
+    }
+
+    if (!suggestion) {
+      bypass.classList.remove('show');
+      return;
+    }
+
+    bypass.innerHTML = ''
+      + '<strong>' + suggestion.label + '</strong>'
+      + suggestion.explain
+      + '<div style="margin-top:0.6rem; word-break:break-all;">'
+      + '<code>' + suggestion.uri + '</code>'
+      + '<button class="bypass-copy" type="button" data-copy="' + encodeURIComponent(suggestion.uri) + '">copy</button>'
+      + '</div>';
+    bypass.classList.add('show');
+  }
+
+  msgEl.addEventListener('input', update);
+  titleEl.addEventListener('input', update);
+
+  copyBtn.addEventListener('click', function () {
+    copy(urlBox.textContent);
+  });
+
+  bypass.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-copy]');
+    if (!btn) return;
+    copy(decodeURIComponent(btn.getAttribute('data-copy')));
+  });
+
+  function copy(s) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(s).then(flashToast, fallback);
+    } else fallback();
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = s;
+      ta.style.position = 'fixed';
+      ta.style.top = '-1000px';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      flashToast();
+    }
+  }
+
+  function flashToast() {
+    var t = document.getElementById('toast');
+    t.classList.add('show');
+    setTimeout(function () { t.classList.remove('show'); }, 1200);
+  }
+
+  // Pre-fill from URL params for sharable generator links
+  var pre = new URLSearchParams(window.location.search);
+  if (pre.has('t')) msgEl.value = pre.get('t');
+  if (pre.has('title')) titleEl.value = pre.get('title');
+  update();
+})();
+</script>
+
+</body>
+</html>
