@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>nfc-text</title>
+<meta name="description" content="Read short messages from NFC tags on iPhone, without spinning up your own website.">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)">
+
+<!-- Open Graph / unfurl. Static defaults for the pitch page; the display page
+     will overwrite og:title / og:description from the fragment via JS, though
+     most unfurlers won't re-execute JS — for accurate per-message previews
+     you'd need a backend. Static is fine for the pitch-mode share. -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="nfc-text">
+<meta property="og:description" content="A tiny page that shows the message stored in its URL. Built for NFC tags.">
+<meta property="og:site_name" content="nfc-text">
+<meta property="og:image" content="/og.png">
+<meta property="og:image:alt" content="nfc-text — a tiny page that shows the message stored in its URL">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="nfc-text">
+<meta name="twitter:description" content="A tiny page that shows the message stored in its URL. Built for NFC tags.">
+<meta name="twitter:image" content="/og.png">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+
+<style>
+  :root {
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--mono);
+    font-size: 1.125rem;
+    line-height: 1.5;
+    margin: 0;
+    padding: 1rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    box-sizing: border-box;
+  }
+  a { color: #03c; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  [data-bs-theme="dark"] a { color: #39f; }
+
+  /* Display mode — the message itself */
+  main.display {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 1.5rem;
+  }
+  .title {
+    font-size: 1rem;
+    opacity: 0.6;
+    font-weight: normal;
+    margin: 0;
+    letter-spacing: 0.02em;
+  }
+  .message {
+    font-size: clamp(1.5rem, 6vw, 3rem);
+    line-height: 1.3;
+    margin: 0;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+    max-width: 90ch;
+    white-space: pre-wrap;
+  }
+  .actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .actions .btn {
+    font-family: var(--mono);
+    border-radius: 0;
+    padding: 0.6rem 1.25rem;
+  }
+  .btn-primary {
+    background: #4a2;
+    border-color: #4a2;
+    color: white;
+  }
+  .btn-primary:hover, .btn-primary:focus { background: #391; border-color: #391; }
+  [data-bs-theme="dark"] .btn-primary { background: #464; border-color: #464; }
+  [data-bs-theme="dark"] .btn-primary:hover, [data-bs-theme="dark"] .btn-primary:focus { background: #383; border-color: #383; }
+  .btn-outline-secondary { font-family: var(--mono); border-radius: 0; }
+
+  /* Pitch mode — the bare domain landing */
+  main.pitch {
+    flex: 1;
+    max-width: 64ch;
+    margin: 0 auto;
+    padding: 2rem 0;
+  }
+  main.pitch h1 {
+    font-family: var(--mono);
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin: 0 0 1.5rem;
+  }
+  main.pitch p { margin: 0 0 1rem; text-align: left; }
+  main.pitch p.lead { text-align: center; opacity: 0.8; }
+  main.pitch h2 {
+    font-family: var(--mono);
+    font-size: 1rem;
+    font-weight: bold;
+    margin: 2rem 0 0.75rem;
+    text-align: left;
+    opacity: 0.6;
+    text-transform: lowercase;
+    letter-spacing: 0.05em;
+  }
+  .examples {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    text-align: left;
+  }
+  .examples li { margin: 0.5rem 0; }
+  .examples .label { opacity: 0.6; }
+  .cta {
+    display: inline-block;
+    margin: 2rem 0;
+    padding: 0.6rem 1.25rem;
+    background: #4a2;
+    color: white !important;
+    text-decoration: none;
+  }
+  .cta:hover { background: #391; text-decoration: none; }
+  [data-bs-theme="dark"] .cta { background: #464; }
+  [data-bs-theme="dark"] .cta:hover { background: #383; }
+
+  footer {
+    font-size: 0.85rem;
+    opacity: 0.5;
+    padding: 1rem 0;
+  }
+  footer a { color: inherit; text-decoration: underline; }
+
+  /* Toast for copy confirmation */
+  .copied-toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #4a2;
+    color: white;
+    padding: 0.5rem 1rem;
+    font-family: var(--mono);
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+  }
+  .copied-toast.show { opacity: 1; }
+  [data-bs-theme="dark"] .copied-toast { background: #464; }
+</style>
+
+<script>
+  // Auto light/dark via prefers-color-scheme. Set on <html> before render to avoid flash.
+  (function () {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    function apply() {
+      document.documentElement.setAttribute('data-bs-theme', mq.matches ? 'dark' : 'light');
+    }
+    apply();
+    mq.addEventListener('change', apply);
+  })();
+</script>
+</head>
+<body>
+
+<div id="root"></div>
+<div class="copied-toast" id="toast">copied</div>
+
+<script>
+(function () {
+  // Parse fragment params. Use URLSearchParams on the fragment after '#'.
+  var frag = window.location.hash.replace(/^#/, '');
+  var params = new URLSearchParams(frag);
+  var text = params.get('t');
+  var title = params.get('title');
+
+  var root = document.getElementById('root');
+
+  if (text != null && text.length > 0) {
+    renderDisplay(text, title);
+  } else {
+    renderPitch();
+  }
+
+  function renderDisplay(text, title) {
+    var main = document.createElement('main');
+    main.className = 'display';
+
+    if (title) {
+      var h1 = document.createElement('h1');
+      h1.className = 'title';
+      h1.textContent = title;
+      main.appendChild(h1);
+    }
+
+    var msg = document.createElement('p');
+    msg.className = 'message';
+    msg.textContent = text;
+    main.appendChild(msg);
+
+    var actions = document.createElement('div');
+    actions.className = 'actions';
+
+    var primary = detectPrimaryAction(text);
+    if (primary) {
+      var a = document.createElement('a');
+      a.className = 'btn btn-primary';
+      a.href = primary.href;
+      a.textContent = primary.label;
+      actions.appendChild(a);
+    }
+
+    var copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'btn btn-outline-secondary';
+    copy.textContent = 'Copy';
+    copy.addEventListener('click', function () { copyToClipboard(text); });
+    actions.appendChild(copy);
+
+    main.appendChild(actions);
+    root.appendChild(main);
+
+    var foot = document.createElement('footer');
+    foot.innerHTML = '<a href="./">nfc-text</a>';
+    document.body.appendChild(foot);
+
+    document.title = text.slice(0, 60) + (text.length > 60 ? '…' : '');
+  }
+
+  function detectPrimaryAction(s) {
+    var trimmed = s.trim();
+    // Phone: at least 7 digits, optional leading +, allows spaces/dashes/parens
+    if (/^\+?[\d][\d\s\-().]{5,}$/.test(trimmed) && (trimmed.match(/\d/g) || []).length >= 7) {
+      return { label: '📞 Call', href: 'tel:' + trimmed.replace(/[^\d+]/g, '') };
+    }
+    // Email
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      return { label: '✉ Email', href: 'mailto:' + trimmed };
+    }
+    // URL
+    if (/^https?:\/\/\S+$/i.test(trimmed)) {
+      return { label: '🔗 Open', href: trimmed };
+    }
+    return null;
+  }
+
+  function copyToClipboard(s) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(s).then(flashToast, fallbackCopy);
+    } else {
+      fallbackCopy();
+    }
+    function fallbackCopy() {
+      var ta = document.createElement('textarea');
+      ta.value = s;
+      ta.style.position = 'fixed';
+      ta.style.top = '-1000px';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      flashToast();
+    }
+  }
+
+  function flashToast() {
+    var t = document.getElementById('toast');
+    t.classList.add('show');
+    setTimeout(function () { t.classList.remove('show'); }, 1200);
+  }
+
+  function renderPitch() {
+    var main = document.createElement('main');
+    main.className = 'pitch';
+
+    main.innerHTML = [
+      '<h1>nfc-text</h1>',
+      '<p class="lead">A tiny page that shows the message stored in its URL.</p>',
+      '<p>Built for NFC tags. iPhones can only act on <code>http(s):</code>, <code>tel:</code>, <code>mailto:</code>, <code>sms:</code>, and a few other URI schemes when you tap a tag — they ignore plain-text NDEF records. So if you want a tag to show, say, a door code or a coupon, you need to point it at a webpage. This is that webpage.</p>',
+      '<p>No backend. No database. No tracking. The message lives entirely in the URL after the <code>#</code>, so the server never sees it.</p>',
+      '<p style="text-align:center"><a class="cta" href="./make/">Make a tag URL →</a></p>',
+      '<h2>examples</h2>',
+      '<ul class="examples">',
+      '  <li><span class="label">door code:</span> <a href="#t=Door%20code%3A%204827">Door code: 4827</a></li>',
+      '  <li><span class="label">coupon:</span> <a href="#t=SAVE20PCT">SAVE20PCT</a></li>',
+      '  <li><span class="label">note:</span> <a href="#t=The%20Wi-Fi%20password%20is%20on%20the%20fridge.">Wi-Fi password is on the fridge.</a></li>',
+      '  <li><span class="label">phone (call CTA):</span> <a href="#t=%2B15551234567">+1 555 123 4567</a></li>',
+      '  <li><span class="label">email (mail CTA):</span> <a href="#t=hello%40example.com">hello@example.com</a></li>',
+      '  <li><span class="label">multiline:</span> <a href="#t=Front%20door%0AKnock%203%20times%0AThen%20wait">Front door / Knock 3 times…</a></li>',
+      '</ul>',
+      '<h2>when you don\'t need this</h2>',
+      '<p>If your message is <em>just</em> a phone number, email, or SMS, write a <code>tel:</code>, <code>mailto:</code>, or <code>sms:</code> URI directly to your tag. iOS handles those natively — no website round-trip needed. The <a href="./make/">generator</a> will tell you when this applies.</p>'
+    ].join('\n');
+
+    root.appendChild(main);
+
+    var foot = document.createElement('footer');
+    foot.innerHTML = '<a href="https://github.com/" target="_blank" rel="noopener">source</a>';
+    document.body.appendChild(foot);
+  }
+})();
+</script>
+
+</body>
+</html>
