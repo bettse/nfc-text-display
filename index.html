@@ -182,19 +182,28 @@
 
 <script>
 (function () {
-  // Parse fragment params. Use URLSearchParams on the fragment after '#'.
-  var frag = window.location.hash.replace(/^#/, '');
-  var params = new URLSearchParams(frag);
-  var text = params.get('t');
-  var title = params.get('title');
-
   var root = document.getElementById('root');
 
-  if (text != null && text.length > 0) {
-    renderDisplay(text, title);
-  } else {
-    renderPitch();
+  function render() {
+    // Wipe whatever was there before — fragment changes re-render in place
+    // since the browser doesn't reload the page when only the hash changes.
+    root.innerHTML = '';
+    document.querySelectorAll('footer').forEach(function (f) { f.remove(); });
+
+    var params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    var text = params.get('t');
+    var title = params.get('title');
+
+    if (text != null && text.length > 0) {
+      renderDisplay(text, title);
+    } else {
+      renderPitch();
+      document.title = 'nfc-text';
+    }
   }
+
+  render();
+  window.addEventListener('hashchange', render);
 
   function renderDisplay(text, title) {
     var main = document.createElement('main');
