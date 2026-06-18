@@ -295,8 +295,13 @@
       return;
     }
 
-    var frag = 't=' + encodeURIComponent(t);
-    if (title) frag += '&title=' + encodeURIComponent(title);
+    // Encode spaces as '+' instead of %20 to save 2 bytes per space on the tag.
+    // URLSearchParams decodes '+' back to space transparently on the display side.
+    // Literal '+' in the input is still safely encoded as %2B by encodeURIComponent
+    // before the replace runs, so there's no ambiguity.
+    var encode = function (s) { return encodeURIComponent(s).replace(/%20/g, '+'); };
+    var frag = 't=' + encode(t);
+    if (title) frag += '&title=' + encode(title);
     var url = base + '#' + frag;
 
     urlBox.textContent = url;
